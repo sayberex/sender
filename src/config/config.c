@@ -8,27 +8,11 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
-
 #include	<unistd.h>
-
-#include	<sys/socket.h>
-#include	<sys/ioctl.h>
-
-#include	<net/if.h>
-#include	<net/if_packet.h>
-#include	<net/ethernet.h>
-#include	<net/if_arp.h>
-
-#include 	<arpa/inet.h>
-
-
-
-
 
 #include	"config.h"
 
 unsigned char	iface_MAC_DST[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};//network interface MAC
-unsigned char	iface_MAC_SRC[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};//network interface MAC
 char			iface_name[IF_NAME_LEN] = {0};							//network interface name
 
 unsigned long	f_iface_name_set;										//is name readed from config file
@@ -36,7 +20,6 @@ unsigned long	f_iface_MAC_set;										//is MAC readed from config file
 
 void 			config_exclude	(char *str, char sym);					//exclude symbols(sym) from string(str)
 void 			config_getparam	(char *str);							//parse config file and set params
-int 			config_getMAC	(unsigned char mac[6]);					//get current interface MAC
 
 int config_LoadFromFile(void) {
 	#define	MAX_STR_LEN	32												//Maximal string length readed from file
@@ -50,24 +33,19 @@ int config_LoadFromFile(void) {
 
 		while (fgets(str, MAX_STR_LEN, fp) != NULL) {					//read strings from file
 			config_exclude(str,' ');									//exclude all spaces from string
+			config_exclude(str,'\n');									//exclude all spaces from string
+			config_exclude(str,'\r');									//exclude all spaces from string
 			config_getparam(str);										//parse config params
 		}
 
 		if ((f_iface_name_set) && (f_iface_MAC_set)) {					//check is destenation network interface name & MAC set
 
-			//if (config_getMAC(iface_MAC_SRC) != 0) {							//check is source network interface MAC set
+			printf("iface name: %s\n", iface_name);						//show network interface name readed from config file
 
-				printf("IFace name : %s", iface_name);						//show network interface name readed from config file
-
-				printf("MAC address: %02x %02x %02x %02x %02x %02x\n",		//show source MAC
-						iface_MAC_SRC[0], iface_MAC_SRC[1],iface_MAC_SRC[2],
-						iface_MAC_SRC[3],iface_MAC_SRC[4],iface_MAC_SRC[5]);
-
-				printf("MAC address: %02x %02x %02x %02x %02x %02x\n",		//show destenation MAC
-						iface_MAC_DST[0], iface_MAC_DST[1],iface_MAC_DST[2],
-						iface_MAC_DST[3],iface_MAC_DST[4],iface_MAC_DST[5]);
-				return 1;
-			//}
+			printf("DST MAC   : %02x %02x %02x %02x %02x %02x\n",		//show destenation MAC
+					iface_MAC_DST[0],iface_MAC_DST[1],iface_MAC_DST[2],
+					iface_MAC_DST[3],iface_MAC_DST[4],iface_MAC_DST[5]);
+			return 1;
 		}
 
 		fclose(fp);
@@ -108,19 +86,4 @@ void config_getparam(char *str) {
 			tmpstr[0] = *(str +14); tmpstr[1] = *(str +15); iface_MAC_DST[5] = strtol(tmpstr,NULL,16); //atoi(tmpstr);
 		}
 	}
-}
-
-int config_getMAC(unsigned char mac[6]) {
-	struct ifreq s;
-	int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
-
-	strcpy(s.ifr_ifrn.ifrn_name,iface_name);
-	if (0 == ioctl(fd, SIOCGIFHWADDR, &s)) {
-		int	i;
-		for (i = 0; i < 6; ++i) mac[i] = s.ifr_ifru.ifru_addr.sa_data[i];
-		close(fd);
-		return 1;
-	}
-	close(fd);
-	return 0;
 }

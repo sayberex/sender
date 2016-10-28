@@ -12,11 +12,14 @@
 #include <stdlib.h>
 
 #include	"config/config.h"
+#include	"net/net.h"
 
 int main(void) {
 
 	if (config_LoadFromFile()) {
-		//code
+		if (net_init()) {
+			net_send("cmd");
+		}
 	}
 	puts("Terminated");
 	return EXIT_SUCCESS;
