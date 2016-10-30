@@ -26,6 +26,8 @@
 #include 	<arpa/inet.h>
 
 #include	"../config/config.h"
+#include	"../crc/crc.h"
+
 
 int				iface_index;
 unsigned char	iface_MAC_SRC[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};//network interface MAC
@@ -33,7 +35,6 @@ int				net_socketfd;
 
 int 			net_getMAC		(unsigned char mac[6]);					//get current interface MAC
 int 			net_createsocket(int *socketfd);
-unsigned long 	fcs_calc(unsigned short fcs_start, unsigned short fcs_stop, unsigned short buff[]);
 
 int	net_init(void) {
 	if (net_getMAC(iface_MAC_SRC) != 0) {							//check is source network interface MAC set
@@ -47,7 +48,7 @@ int	net_init(void) {
 
 			if (net_createsocket(&net_socketfd)) {
 
-
+				crcInit();
 				//close(net_socketfd);
 				return 1;
 			}
@@ -99,6 +100,11 @@ int net_createsocket(int *socketfd) {
 	}
 }
 
+union {
+	unsigned long	ulValue;
+	unsigned char	Bytes[4];
+} uSndCRC;
+
 void net_snd(int socketfd, char *sndstr) {
 	//target address
 	struct sockaddr_ll socket_addr = {
@@ -127,19 +133,20 @@ void net_snd(int socketfd, char *sndstr) {
 	memcpy((void *)data, (void *)sndstr, strlen(sndstr));		//fill frame with some data
 
 
-	/*etherhead[ETH_FRAME_LEN - 4] = 0x1A;
-	etherhead[ETH_FRAME_LEN - 3] = 0x39;
-	etherhead[ETH_FRAME_LEN - 2] = 0xEA;
-	etherhead[ETH_FRAME_LEN - 1] = 0x38;*/
+	uSndCRC.ulValue = crcFast(pvSndBuf, ETH_FRAME_LEN - 4);
+	printf("Send Packet CRC = %x\n", uSndCRC.ulValue);
 
-	int checkval = fcs_calc(0, ETH_FRAME_LEN - 4, pvSndBuf);
+	etherhead[ETH_FRAME_LEN - 4] = uSndCRC.Bytes[0];
+	etherhead[ETH_FRAME_LEN - 3] = uSndCRC.Bytes[1];
+	etherhead[ETH_FRAME_LEN - 2] = uSndCRC.Bytes[2];
+	etherhead[ETH_FRAME_LEN - 1] = uSndCRC.Bytes[3];
 
 	if ( strlen(sndstr) < (ETH_FRAME_LEN - (6 + 6 + 2 + 4)) ) {
 		iResult = sendto(socketfd, pvSndBuf, ETH_FRAME_LEN, 0,
 				(struct sockaddr *)&socket_addr, sizeof(socket_addr));
 
 		if (iResult == -1) 	puts	("error sendto");
-		else 				printf	("%d bytes sended", iResult);
+		else 				printf	("%d bytes sended\n", iResult);
 	}
 	else puts("packet too long");
 }
@@ -148,34 +155,4 @@ void net_send(char *sndstr) {
 	net_snd(net_socketfd, sndstr);
 }
 
-typedef unsigned short u16;
 
-unsigned long fcs_calc(unsigned short fcs_start, unsigned short fcs_stop, unsigned short buff[]) {
-#define P	0x8408
-#define fcsinit	0xFFFF
-
-static u16 fcstab[256];
-u16 fcs;
-u16 b, v;
-u16 i;
-u16 MSB_fcs, LSB_fcs;
-
-	for (b=0; ; ){
-  	  v = b;
-	  for (i = 8; i--; )
-	     v = v & 1 ? (v >> 1) ^ P : v >> 1;
-  	  fcstab[b] = v & 0xFFFF;
-	  if (++b == 256)
-	    break;
-	}
-
-	fcs = fcsinit;
-	for (i=fcs_start; i<fcs_stop; i++)
-	  fcs = (fcs >> 8) ^ fcstab[(fcs ^ buff[i]) & 0xFF];
-	fcs ^= 0xFFFF;
-
-	LSB_fcs = ((fcs >> 8) & 0xFF);
-	MSB_fcs = fcs & 0xFF;
-
-	return ((MSB_fcs<<16) | LSB_fcs);
-}
