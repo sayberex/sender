@@ -149,6 +149,7 @@ void net_snd(int socketfd, char *sndstr) {
 		else 				printf	("%d bytes sended\n", iResult);
 	}
 	else puts("packet too long");
+	free(pvSndBuf);
 }
 
 void net_send(char *sndstr) {
