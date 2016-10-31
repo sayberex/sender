@@ -31,7 +31,8 @@
 
 int				iface_index;
 unsigned char	iface_MAC_SRC[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};//network interface MAC
-int				net_socketfd;
+int				net_snd_socketfd;
+int				net_rcv_socketdf;
 
 int 			net_getMAC		(unsigned char mac[6]);					//get current interface MAC
 int 			net_createsocket(int *socketfd);
@@ -46,7 +47,7 @@ int	net_init(void) {
 		if ((iface_index = if_nametoindex(iface_name)) != 0) {
 			printf("%s index: %d\n", iface_name, iface_index);
 
-			if (net_createsocket(&net_socketfd)) {
+			if (net_createsocket(&net_snd_socketfd)) {
 
 				crcInit();
 				//close(net_socketfd);
@@ -153,7 +154,20 @@ void net_snd(int socketfd, char *sndstr) {
 }
 
 void net_send(char *sndstr) {
-	net_snd(net_socketfd, sndstr);
+	net_snd(net_snd_socketfd, sndstr);
 }
 
+void net_recv(void) {
+	unsigned long	ulRcvLen;
+	unsigned char 	ucRcvBuf[ETH_FRAME_LEN];
+
+	ulRcvLen = 0;
+	ulRcvLen = recvfrom(net_rcv_socketdf ,ucRcvBuf, ETH_FRAME_LEN, 0. NULL, NULL);
+	//check if its our mac
+	//check msg identifier(signature)
+	//maby give eth struct to function and checm mac there
+	if (ulRcvLen != -1) {
+		//put output
+	}
+}
 

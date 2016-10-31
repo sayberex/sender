@@ -20,11 +20,18 @@
 
 void *fnThread_KbdProcess(void *args);
 
+void fnpipe(void);
+
 int main(void) {
 	char c;
 	int id1;
 	#define	BUFFER_SIZE  (1514 - 18)
 	char	InCmd[BUFFER_SIZE];
+
+
+
+	fnpipe();
+
 
 	if (config_LoadFromFile()) {
 		if (net_init()) {
@@ -84,3 +91,37 @@ void *fnThread_KbdProcess(void *args) {
 	pthread_exit(NULL);
 	return 0;
 }
+
+void fnpipe(void) {
+	FILE	*fd;
+
+	char	buf[1024];
+	if ((fd = popen("ls -a","r")) != NULL) {
+		puts("pipe created");
+
+		//fread does not distinguish between end-of-file and error and callers must use feof and ferror to determine which occured
+		fread(buf, sizeof(buf),1,fd);
+
+		puts(buf);
+	}
+	else puts("pipe not created");
+
+	pclose(fd);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
