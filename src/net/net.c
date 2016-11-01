@@ -105,53 +105,67 @@ int net_createsocket(int *socketfd) {
 union {
 	unsigned long	ulValue;
 	unsigned char	Bytes[4];
-} uSndCRC;
+} uSndCRC, uRcvCRC, uRcvCalculatedCRC;
 
 void net_snd(int socketfd, char *sndstr) {
-	//target address
-	struct sockaddr_ll socket_addr = {
-		PF_PACKET,			/*sll_family*/					//Protocol family PF_PACKET - Device level Packet Socket(AF_INET(IPv4), AF_INET6(IPv6))
-		htons(ETH_P_ALL),	/*sll_protocol*/				//low level protocol ID (like CAN IrDA and so on)
-		0,					/*sll_ifindex*/					//communication interface index(eth0)
-		ARPHRD_ETHER,		/*sll_hatype*/					//ARP Protocol Hardware ID(Ethernet 10Mbps)
-		PACKET_OTHERHOST,	/*sll_pkttype*/					//PACKET Type(to all broadcast/to group multicast/to user space /to kernel space/ and so on)
-		ETH_ALEN,			/*sll_halen*/					//Ethernet address length(MAC - length)
-		{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}	//Physical layer MAC
-	};
 
-	socket_addr.sll_ifindex = iface_index;					//network interface index
+	//check if data length less or equal that frame can contain
+	if (strlen(sndstr) < MY_PROTO_MAX_DATA_LEN) {
 
-	void 		  *pvSndBuf 	= (void *)malloc(ETH_FRAME_LEN);//Send Packet Buffer
-	unsigned char *etherhead	= pvSndBuf;					//Ethernet header pointer
-	unsigned char *data 		= pvSndBuf + 14;			//Ethernet packet data pointer
-	struct ethhdr *eh 			= (struct ethhdr *)etherhead;//Structure pointer to Ethernet header
-	int	iResult;
+		struct sockaddr_ll socket_addr = {
+				PF_PACKET,			/*sll_family*/					//Protocol family PF_PACKET - Device level Packet Socket(AF_INET(IPv4), AF_INET6(IPv6))
+				htons(ETH_P_ALL),	/*sll_protocol*/				//low level protocol ID (like CAN IrDA and so on)
+				0,					/*sll_ifindex*/					//communication interface index(eth0)
+				ARPHRD_ETHER,		/*sll_hatype*/					//ARP Protocol Hardware ID(Ethernet 10Mbps)
+				PACKET_OTHERHOST,	/*sll_pkttype*/					//PACKET Type(to all broadcast/to group multicast/to user space /to kernel space/ and so on)
+				ETH_ALEN,			/*sll_halen*/					//Ethernet address length(MAC - length)
+				{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}	//Physical layer MAC
+		};
 
-	//Set the frame header
-	memcpy((void *)pvSndBuf, 			(void *)iface_MAC_DST, ETH_ALEN);
-	memcpy((void *)pvSndBuf + ETH_ALEN, (void *)iface_MAC_SRC, ETH_ALEN);
-	eh->h_proto = 0;
+		socket_addr.sll_ifindex = iface_index;						//network interface index
 
-	memcpy((void *)data, (void *)sndstr, strlen(sndstr));		//fill frame with some data
+		void 		  *pvSndBuf 	= (void *)malloc(ETH_FRAME_LEN);//Send Packet Buffer
+		unsigned char *etherhead	= pvSndBuf;						//Ethernet header pointer
+		unsigned char *data 		= pvSndBuf + 14;				//Ethernet packet data pointer
+
+		int	iResult;
+		stMyProtoHdr_t	*pstMyProtoHdr = (stMyProtoHdr_t *)pvSndBuf;
+
+		//Set the frame header
+		//struct ethhdr *eh 			= (struct ethhdr *)etherhead;//Structure pointer to Ethernet header
+		//memcpy((void *)pvSndBuf, 			(void *)iface_MAC_DST, ETH_ALEN);
+		//memcpy((void *)pvSndBuf + ETH_ALEN, (void *)iface_MAC_SRC, ETH_ALEN);
+		//eh->h_proto = 0;
+
+																	// fill ethernet header
+		memcpy(pstMyProtoHdr->h_dest, 	iface_MAC_DST, ETH_ALEN);	// fill with dst mac
+		memcpy(pstMyProtoHdr->h_source, iface_MAC_SRC, ETH_ALEN);	// fill with src mac
+		pstMyProtoHdr->h_proto = 0;									// fill with L3 protocol type
+
+																	// fill myprotocol header
+		pstMyProtoHdr->h_len = strlen(sndstr);						// fill myprotocol data length
+		memcpy(pstMyProtoHdr->h_sign,MY_PROTO_SIGN, strlen(MY_PROTO_SIGN)); // fill with myprotocol signature
+		memcpy(pstMyProtoHdr->data, (void *)sndstr, strlen(sndstr));		// fill with muprotocol data
+
+																	// Calculate amd set packet crc
+		uSndCRC.ulValue = crcFast(pvSndBuf, ETH_FRAME_LEN - 4);
+		//printf("Send Packet CRC = %x\n", uSndCRC.ulValue);
+																	//Fill packet with CRC
+		((unsigned char *)pvSndBuf)[ETH_FRAME_LEN - 4] = uSndCRC.Bytes[0];
+		((unsigned char *)pvSndBuf)[ETH_FRAME_LEN - 3] = uSndCRC.Bytes[1];
+		((unsigned char *)pvSndBuf)[ETH_FRAME_LEN - 2] = uSndCRC.Bytes[2];
+		((unsigned char *)pvSndBuf)[ETH_FRAME_LEN - 1] = uSndCRC.Bytes[3];
 
 
-	uSndCRC.ulValue = crcFast(pvSndBuf, ETH_FRAME_LEN - 4);
-	printf("Send Packet CRC = %x\n", uSndCRC.ulValue);
 
-	etherhead[ETH_FRAME_LEN - 4] = uSndCRC.Bytes[0];
-	etherhead[ETH_FRAME_LEN - 3] = uSndCRC.Bytes[1];
-	etherhead[ETH_FRAME_LEN - 2] = uSndCRC.Bytes[2];
-	etherhead[ETH_FRAME_LEN - 1] = uSndCRC.Bytes[3];
-
-	if ( strlen(sndstr) < (ETH_FRAME_LEN - (6 + 6 + 2 + 4)) ) {
 		iResult = sendto(socketfd, pvSndBuf, ETH_FRAME_LEN, 0,
 				(struct sockaddr *)&socket_addr, sizeof(socket_addr));
 
 		if (iResult == -1) 	puts	("error sendto");
 		else 				printf	("%d bytes sended\n", iResult);
+
+		free(pvSndBuf);
 	}
-	else puts("packet too long");
-	free(pvSndBuf);
 }
 
 void net_send(char *sndstr) {
@@ -171,20 +185,35 @@ void net_recv(void) {
 	//if data received ok
 	if (ulRcvLen != -1) {
 
+		//check packet crc
 		//check for minimal packet size
-		if (ulRcvLen >= MY_PROTO_MIN_LEN) {
+		//if (ulRcvLen >= MY_PROTO_MIN_LEN) {
+		if (ulRcvLen == ETH_FRAME_LEN) {
 
-			//check if its our mac
-			if (memcmp(pstMyProtoHdr->h_dest, iface_MAC_SRC, 6) == 0) {
+			//get packet CRC
+			uRcvCRC.Bytes[0] = ((unsigned char *)ucRcvBuf)[ETH_FRAME_LEN - 4];
+			uRcvCRC.Bytes[1] = ((unsigned char *)ucRcvBuf)[ETH_FRAME_LEN - 3];
+			uRcvCRC.Bytes[2] = ((unsigned char *)ucRcvBuf)[ETH_FRAME_LEN - 2];
+			uRcvCRC.Bytes[3] = ((unsigned char *)ucRcvBuf)[ETH_FRAME_LEN - 1];
 
-				//check for protocol signature
-				if (memcmp(pstMyProtoHdr->h_sign, MY_PROTO_SIGN, strlen(MY_PROTO_SIGN)) == 0) {
+			//calculate packet CRC
+			uRcvCalculatedCRC.ulValue = crcFast(ucRcvBuf, ETH_FRAME_LEN -4);
 
-					//check correct packet length
-					if ((pstMyProtoHdr->h_len > 0) && (pstMyProtoHdr->h_len < MY_PROTO_MAX_DATA_LEN)) {
+			//compare CRC
+			if (uRcvCRC.ulValue == uRcvCalculatedCRC.ulValue) {
 
-						//output received data to stdout
-						fwrite(pstMyProtoHdr->data , sizeof(unsigned char), pstMyProtoHdr->h_len, stdout);
+				//check if its our mac
+				if (memcmp(pstMyProtoHdr->h_dest, iface_MAC_SRC, 6) == 0) {
+
+					//check for protocol signature
+					if (memcmp(pstMyProtoHdr->h_sign, MY_PROTO_SIGN, strlen(MY_PROTO_SIGN)) == 0) {
+
+						//check correct packet length
+						if ((pstMyProtoHdr->h_len > 0) && (pstMyProtoHdr->h_len < MY_PROTO_MAX_DATA_LEN)) {
+
+							//output received data to stdout
+							fwrite(pstMyProtoHdr->data , sizeof(unsigned char), pstMyProtoHdr->h_len, stdout);
+						}
 					}
 				}
 			}
