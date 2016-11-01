@@ -32,9 +32,8 @@
 
 	extern unsigned char	iface_MAC_SRC[6];
 
-
-
 	extern	int				net_init(void);
 	extern	void 			net_send(char *sndstr);
+	extern	void 			net_recv(void);
 
 #endif /* NET_NET_H_ */

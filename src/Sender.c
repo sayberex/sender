@@ -29,7 +29,7 @@ int main(void) {
 	char	InCmd[BUFFER_SIZE];
 
 
-	unsigned long	protsign = sizeof(MY_PROTO_SIGN);
+	/*unsigned long	protsign = sizeof(MY_PROTO_SIGN);
 	printf("proto sign = %d\n", protsign);
 
 	#define	stydata "My Data to write"
@@ -38,7 +38,7 @@ int main(void) {
 	printf(":%d",num);
 	return EXIT_SUCCESS;
 
-	fnpipe();
+	fnpipe();*/
 
 
 	if (config_LoadFromFile()) {
@@ -95,6 +95,10 @@ void *fnThread_KbdProcess(void *args) {
 	//	sleep(1);
 		puts("Thread...");
 	//}
+
+	do {
+		net_recv();
+	} while(1);
 
 	pthread_exit(NULL);
 	return 0;
