@@ -27,6 +27,7 @@
 
 #include	"../config/config.h"
 #include	"../crc/crc.h"
+#include	"net.h"
 
 
 int				iface_index;
@@ -157,17 +158,37 @@ void net_send(char *sndstr) {
 	net_snd(net_snd_socketfd, sndstr);
 }
 
+//memcmp
+
 void net_recv(void) {
-	unsigned long	ulRcvLen;
-	unsigned char 	ucRcvBuf[ETH_FRAME_LEN];
+	unsigned long			ulRcvLen;
+	unsigned char 			ucRcvBuf[ETH_FRAME_LEN];
+	stMyProtoHdr_t			*pstMyProtoHdr = (stMyProtoHdr_t *)ucRcvBuf;
 
 	ulRcvLen = 0;
-	ulRcvLen = recvfrom(net_rcv_socketdf ,ucRcvBuf, ETH_FRAME_LEN, 0. NULL, NULL);
-	//check if its our mac
-	//check msg identifier(signature)
-	//maby give eth struct to function and checm mac there
+	ulRcvLen = recvfrom(net_rcv_socketdf ,ucRcvBuf, ETH_FRAME_LEN, 0, NULL, NULL);
+
+	//if data received ok
 	if (ulRcvLen != -1) {
-		//put output
+
+		//check for minimal packet size
+		if (ulRcvLen >= MY_PROTO_MIN_LEN) {
+
+			//check if its our mac
+			if (memcmp(pstMyProtoHdr->h_dest, iface_MAC_SRC, 6) == 0) {
+
+				//check for protocol signature
+				if (memcmp(pstMyProtoHdr->h_sign, MY_PROTO_SIGN, strlen(MY_PROTO_SIGN)) == 0) {
+
+					//check correct packet length
+					if ((pstMyProtoHdr->h_len > 0) && (pstMyProtoHdr->h_len < MY_PROTO_MAX_DATA_LEN)) {
+
+						//output received data to stdout
+						fwrite(pstMyProtoHdr->data , sizeof(unsigned char), pstMyProtoHdr->h_len, stdout);
+					}
+				}
+			}
+		}
 	}
 }
 

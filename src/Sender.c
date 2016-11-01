@@ -29,6 +29,14 @@ int main(void) {
 	char	InCmd[BUFFER_SIZE];
 
 
+	unsigned long	protsign = sizeof(MY_PROTO_SIGN);
+	printf("proto sign = %d\n", protsign);
+
+	#define	stydata "My Data to write"
+
+	int num = fwrite(stydata, sizeof(unsigned char), strlen(stydata), stdout);
+	printf(":%d",num);
+	return EXIT_SUCCESS;
 
 	fnpipe();
 
