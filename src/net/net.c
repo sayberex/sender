@@ -162,7 +162,7 @@ void net_snd(int socketfd, char *sndstr) {
 				(struct sockaddr *)&socket_addr, sizeof(socket_addr));
 
 		if (iResult == -1) 	puts	("error sendto");
-		else 				printf	("%d bytes sended\n", iResult);
+		//else 				printf	("%d bytes sended\n", iResult);
 
 		free(pvSndBuf);
 	}
