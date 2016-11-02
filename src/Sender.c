@@ -76,7 +76,7 @@ int main(void) {
 			do {
 				printf("cmd>");
 				if (fgets(InCmd, BUFFER_SIZE - 1/*-1 for null*/, stdin) != NULL) {
-					puts(InCmd);
+					//puts(InCmd);
 					//system(InCmd);
 					net_send(InCmd);
 					if (strcmp(InCmd,"exit\n") == 0) break;
@@ -93,7 +93,7 @@ void *fnThread_KbdProcess(void *args) {
 	//int	i;
 	//for (i = 0; i<10; i++) {
 	//	sleep(1);
-		puts("Thread...");
+		//puts("Thread...");
 	//}
 
 	do {

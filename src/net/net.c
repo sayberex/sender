@@ -180,7 +180,7 @@ void net_recv(void) {
 	stMyProtoHdr_t			*pstMyProtoHdr = (stMyProtoHdr_t *)ucRcvBuf;
 
 	ulRcvLen = 0;
-	ulRcvLen = recvfrom(net_rcv_socketfd ,ucRcvBuf, ETH_FRAME_LEN, 0, NULL, NULL);
+	ulRcvLen = recvfrom(net_rcv_socketfd ,ucRcvBuf, ETH_FRAME_LEN, MSG_DONTWAIT, NULL, NULL);
 
 	//if data received ok
 	if (ulRcvLen != -1) {
@@ -212,7 +212,11 @@ void net_recv(void) {
 						if ((pstMyProtoHdr->h_len > 0) && (pstMyProtoHdr->h_len < MY_PROTO_MAX_DATA_LEN)) {
 
 							//output received data to stdout
-							fwrite(pstMyProtoHdr->data , sizeof(unsigned char), pstMyProtoHdr->h_len, stdout);
+							(pstMyProtoHdr->data)[pstMyProtoHdr->h_len] = 0;
+							printf("%scmd>", pstMyProtoHdr->data);
+							fflush(stdout);
+							//fwrite(pstMyProtoHdr->data , sizeof(unsigned char), pstMyProtoHdr->h_len, stdout);
+							//fwrite("\ncmd>", sizeof(unsigned char), 0, stdout);
 						}
 					}
 				}
